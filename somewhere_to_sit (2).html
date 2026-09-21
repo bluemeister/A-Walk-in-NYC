@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Somewhere to Sit</title>
+<style>
+  :root {
+    --paper: #f2f0ea;
+    --ink: #1a1a1a;
+    --faint: #8a8578;
+    --rule: #d6d1c2;
+    --pops: #f4ecd8;
+    --open: #ffd23f;
+    --refuse: #ff5a4e;
+    --sat: #5fe09a;
+    --plan: #ff3b30;
+    --refuse-ink: #b23a2f;
+    --sat-ink: #2f6b4f;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--paper); color: var(--ink); font-family: Georgia, 'Times New Roman', serif; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 32px 24px 64px; }
+  header { display: flex; gap: 40px; flex-wrap: wrap; align-items: flex-start; margin-bottom: 26px; }
+  header h1 { font-size: 1.05rem; letter-spacing: 0.16em; text-transform: uppercase; margin: 0 0 6px; font-weight: 600; }
+  header .sub { font-family: 'Courier New', monospace; font-size: 0.74rem; color: var(--faint); max-width: 300px; line-height: 1.5; }
+  .score { font-family: 'Courier New', monospace; font-size: 0.86rem; line-height: 1.65; color: var(--faint); border-left: 2px solid var(--rule); padding-left: 16px; margin: 0; white-space: pre-line; }
+  main { display: flex; gap: 32px; flex-wrap: wrap; align-items: flex-start; }
+  .board { flex: 1 1 560px; min-width: 320px; }
+  svg#map { width: 100%; height: auto; display: block; background: #23262a; border: 1px solid var(--ink); cursor: crosshair; touch-action: none; user-select: none; }
+  .panel { flex: 0 1 320px; min-width: 280px; }
+  .status { font-size: 1rem; line-height: 1.45; min-height: 52px; margin-bottom: 12px; }
+  .meta { font-family: 'Courier New', monospace; font-size: 0.78rem; color: var(--faint); display: flex; justify-content: space-between; margin-bottom: 8px; }
+  .legs { height: 6px; border: 1px solid var(--ink); margin: 4px 0 16px; position: relative; background: #fff; }
+  .legs > div { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ink); width: 0%; transition: width 0.12s linear; }
+  .legs.tired > div { background: var(--refuse-ink); }
+  button { font-family: Georgia, serif; font-size: 0.82rem; letter-spacing: 0.06em; text-transform: uppercase; background: var(--ink); color: var(--paper); border: 1px solid var(--ink); padding: 9px 16px; cursor: pointer; margin: 4px 8px 4px 0; }
+  button:hover { background: #3a3a3a; }
+  button.ghost { background: transparent; color: var(--ink); }
+  button.ghost:hover { background: #e6e2d8; }
+  .log { font-family: 'Courier New', monospace; font-size: 0.76rem; line-height: 1.55; max-height: 260px; overflow-y: auto; border-top: 1px solid var(--rule); padding-top: 10px; margin-top: 14px; }
+  .log-title { text-transform: uppercase; font-family: Georgia, serif; font-size: 0.7rem; letter-spacing: 0.12em; color: var(--faint); margin-bottom: 6px; }
+  .log div { margin-bottom: 6px; }
+  .log .t { color: var(--faint); }
+  .log .refuse { color: var(--refuse-ink); }
+  .log .sat { color: var(--sat-ink); }
+  .results { margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--rule); }
+  .stat { display: flex; justify-content: space-between; font-family: 'Courier New', monospace; font-size: 0.8rem; margin-bottom: 4px; }
+  .verdict { margin: 14px 0; padding: 12px 14px; background: #fff; border: 1px solid var(--ink); font-size: 0.86rem; font-style: italic; line-height: 1.45; }
+  .history { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--rule); }
+  .history-title { text-transform: uppercase; font-family: Georgia, serif; font-size: 0.7rem; letter-spacing: 0.12em; color: var(--faint); margin-bottom: 8px; }
+  .history table { width: 100%; border-collapse: collapse; font-family: 'Courier New', monospace; font-size: 0.76rem; }
+  .history th, .history td { text-align: right; padding: 2px 0; }
+  .history th:first-child, .history td:first-child { text-align: left; }
+  .history tfoot td { border-top: 1px solid var(--rule); padding-top: 6px; font-weight: bold; }
+  .legend { font-family: 'Courier New', monospace; font-size: 0.7rem; color: var(--faint); margin-top: 8px; display: flex; gap: 18px; flex-wrap: wrap; }
+  .legend span::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  .legend .l-pops::before { background: var(--pops); border: 1px solid #999; }
+  .legend .l-open::before { background: var(--open); }
+  .legend .l-sat::before { background: var(--sat-ink); }
+  .legend .l-ref::before { background: var(--refuse-ink); }
+  .legend .attrib { margin-left: auto; }
+  .legend .attrib::before { display: none; }
+  footer { margin-top: 44px; font-family: 'Courier New', monospace; font-size: 0.7rem; color: var(--faint); border-top: 1px solid var(--rule); padding-top: 12px; }
+  .toggle { background: none; border: none; color: var(--faint); text-decoration: underline; cursor: pointer; padding: 0; margin: 0; font-family: 'Courier New', monospace; font-size: 0.72rem; text-transform: none; letter-spacing: 0; }
+  #about { display: none; font-size: 0.8rem; line-height: 1.6; color: var(--faint); margin-top: 10px; max-width: 680px; }
+
+  /* map */
+  .st { stroke: #fff; stroke-width: 2; opacity: 0.28; }
+  .av { stroke: #fff; stroke-width: 4; opacity: 0.35; }
+  .lbl { font-family: 'Courier New', monospace; font-size: 26px; fill: #fff; paint-order: stroke; stroke: #000; stroke-width: 6px; stroke-opacity: 0.55; pointer-events: none; }
+  .pops { fill: var(--pops); opacity: 0.85; stroke: #000; stroke-width: 2; stroke-opacity: 0.5; cursor: default; }
+  .pops.option { fill: var(--open); opacity: 1; cursor: pointer; }
+  .pops.option:hover { r: 22; }
+  .pops.refused { fill: var(--refuse); opacity: 1; }
+  .pops.sat { fill: var(--sat); opacity: 1; }
+  .ring { fill: none; stroke: var(--open); stroke-width: 3; stroke-dasharray: 10 10; opacity: 0.8; pointer-events: none; }
+  .plan { fill: none; stroke: var(--plan); stroke-width: 5; stroke-dasharray: 14 12; opacity: 0.9; stroke-linejoin: round; stroke-linecap: round; pointer-events: none; }
+  .plan.live { stroke-dasharray: none; opacity: 1; }
+  .ideal { fill: none; stroke: #7fd0ff; stroke-width: 3; stroke-dasharray: 4 8; opacity: 0.7; pointer-events: none; }
+  .walked { fill: none; stroke: var(--open); stroke-width: 8; stroke-linejoin: round; stroke-linecap: round; pointer-events: none; }
+  .walker { fill: #fff; stroke: #000; stroke-width: 3; pointer-events: none; }
+  .endpt { fill: none; stroke: #fff; stroke-width: 4; pointer-events: none; }
+  .nextstep { fill: rgba(255,210,63,0.28); stroke: var(--open); stroke-width: 2.5; cursor: pointer; }
+  .nextstep:hover { fill: rgba(255,210,63,0.6); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Somewhere to Sit</h1>
+      <div class="sub" id="sub"></div>
+    </div>
+    <div class="score">Open maps on your phone in a city you know well.
+Zoom in to approximately a 10 by 10 block radius.
+Take a screenshot.
+Draw a virtual line across your screenshot.
+Walk along the line as best you can.
+Notice all the deviations you must take.</div>
+  </header>
+
+  <main>
+    <div class="board">
+      <svg id="map" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="legend">
+        <span class="l-pops" id="legendCount">privately owned public space</span>
+        <span class="l-open">available to you</span>
+        <span class="l-sat">sat</span>
+        <span class="l-ref">refused</span>
+        <span class="attrib">aerial imagery 2018 © City of New York, CC BY 4.0</span>
+      </div>
+      <div class="legend" id="diffInfo" style="margin-top:4px;"></div>
+    </div>
+
+    <div class="panel">
+      <div class="status" id="status"></div>
+      <div class="meta"><span id="clock">6:22 PM</span><span id="dist">0 blocks</span></div>
+      <div class="legs" id="legs"><div></div></div>
+      <div id="controls"></div>
+      <div class="results" id="results" style="display:none;"></div>
+      <div class="history" id="history" style="display:none;"></div>
+      <div class="log" id="log" style="display:none;">
+        <div class="log-title">Field notes</div>
+        <div id="logEntries"></div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <button class="toggle" id="aboutToggle">notes on this piece</button>
+    <div id="about">
+      The map is a piece of the Manhattan grid, rotated so the avenues run straight up, over the
+      City of New York's own 2018 aerial photography (maps.nyc.gov, CC BY 4.0). Each game opens a
+      different piece of the grid. The dots are the privately owned public spaces (POPS) in NYC
+      Planning's public dataset: plazas, arcades and atriums that developers built in exchange for the
+      right to build taller. There are 366 of them in Manhattan. Whether a space has seating, whether it
+      is indoors, and whether its hours are restricted come from that dataset. What happens when you
+      arrive is decided by those three facts and by the time on the clock.<br><br>
+      You draw the shape of the trip you intend, but the length that trip must cover is set by the
+      round's difficulty, not by you — draw something shorter or longer than the required range and it
+      is rejected before it starts. That closes the obvious loophole: you cannot inflate your score by
+      giving yourself an easy, trivial swipe. The lit corners are the only steps you can take from where
+      you stand — you choose the actual path, block by block, and it is scored against the shortest path
+      the grid could have given you: the blue dotted line. Every so often your legs give out, and the
+      only places to rest belong to someone. Score well against that fixed difficulty and the next round
+      tightens — longer required trips, shorter legs, earlier closings. Score badly and it loosens. Each
+      choice is logged, the way a phone would log it, and your record accumulates below.
+    </div>
+  </footer>
+</div>
+
+<script>
+const POPS = [{"id":"M050022","n":"Men's Apparel","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.762575,"lon":-73.977778},{"id":"M050065","n":"Three Park Avenue","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.746511,"lon":-73.981075},{"id":"M050117","n":"","t":"Open Air Concourse","h":"","s":0,"i":1,"r":0,"lat":40.756662,"lon":-73.976058},{"id":"M080022","n":"Fontaine","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.7683,"lon":-73.956462},{"id":"M080069","n":"Andover","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.77771,"lon":-73.946331},{"id":"M010058","n":"Verizon Building","t":"Arcade; Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.710907,"lon":-74.001176},{"id":"M080080","n":"One East River Place","t":"Public Park","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.766492,"lon":-73.952113},{"id":"M050045","n":"","t":"Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.756418,"lon":-73.975094},{"id":"M050006","n":"","t":"Arcade; Plaza (in C5-3); Plaza (in C6-4)","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.762219,"lon":-73.969317},{"id":"M080056","n":"","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.775349,"lon":-73.9509},{"id":"M080039","n":"Evans Tower","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.777876,"lon":-73.955231},{"id":"M060054","n":"","t":"Arcade; Covered Pedestrian Space; Open Space; Public Circulation Space","h":"24 Hours; Restricted Hours","s":1,"i":1,"r":1,"lat":40.757218,"lon":-73.969196},{"id":"M060035","n":"Architects and Designers","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.761036,"lon":-73.967924},{"id":"M040008","n":"St. Luke's-Roosevelt Hospital Center","t":"Public Open Space","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.769696,"lon":-73.986888},{"id":"M080061","n":"Mill Rock Plaza","t":"Plaza; Special Permit Arcade","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.78178,"lon":-73.946256},{"id":"M050079","n":"","t":"Open Park Space; Plaza","h":"24 Hours; Restricted Hours","s":1,"i":0,"r":1,"lat":40.761387,"lon":-73.969367},{"id":"M050020","n":"La Premiere","t":"Residential Plaza","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.764686,"lon":-73.982694},{"id":"M060018","n":"Trump World Tower","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.752562,"lon":-73.96782},{"id":"M060085","n":"Future","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.744021,"lon":-73.97896},{"id":"M080006","n":"","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.770092,"lon":-73.964136},{"id":"M050026","n":"","t":"Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.761966,"lon":-73.978478},{"id":"M060051","n":"Crystal Pavilion","t":"Covered Pedestrian Space","h":"Restricted Hours","s":1,"i":1,"r":1,"lat":40.755388,"lon":-73.97054},{"id":"M110001","n":"Monterey","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.785712,"lon":-73.949629},{"id":"M060077","n":"Plaza 400","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.757098,"lon":-73.963125},{"id":"M010045","n":"Barclays Bank","t":"Arcade; Non-Bonused Public Open Space; Urban Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.705041,"lon":-74.008119},{"id":"M050049","n":"","t":"Covered Pedestrian Space","h":"Restricted Hours","s":1,"i":1,"r":1,"lat":40.756268,"lon":-73.978242},{"id":"M080048","n":"Newbury","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.778385,"lon":-73.951833},{"id":"M050061","n":"","t":"Arcade; Sidewalk Widening; Urban Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.750874,"lon":-73.977756},{"id":"M050084","n":"Symphony House","t":"Urban Plaza","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.765974,"lon":-73.982553},{"id":"M050095","n":"Tower 49","t":"Arcade; Public Access Passageway; Sidewalk Widening; Urban Plaza","h":"24 Hours; Restricted Hours","s":1,"i":1,"r":1,"lat":40.757231,"lon":-73.977022},{"id":"M010028","n":"Goldman Sachs","t":"Arcade; Publicly Accessible Lobby; Sidewalk Widening; Urban Plaza","h":"24 Hours; Restricted Hours","s":1,"i":1,"r":1,"lat":40.703993,"lon":-74.011054},{"id":"M010010","n":"Wall Street Plaza","t":"Special Permit Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.705662,"lon":-74.006168},{"id":"M070012","n":"Two Lincoln Square","t":"Covered Plaza; Mandatory Arcade; Special Permit Plaza; Through Block Arcade","h":"24 Hours; Restricted Hours","s":1,"i":1,"r":1,"lat":40.773157,"lon":-73.981428},{"id":"M070029","n":"Riverside Center","t":"Public Access Area","h":"","s":0,"i":0,"r":0,"lat":40.772677,"lon":-73.991804},{"id":"M010023","n":"","t":"Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.708074,"lon":-74.01485},{"id":"M010011","n":"","t":"Enclosed Public Space; Outdoor Public Space","h":"24 Hours; Restricted Hours","s":1,"i":1,"r":1,"lat":40.705269,"lon":-74.005515},{"id":"M060062","n":"Belmont","t":"Residential Plaza","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.751701,"lon":-73.96956},{"id":"M010041","n":"","t":"Open Pedestrian Area; Special Permit Arcade","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.706362,"lon":-74.005129},{"id":"M050094","n":"Stanford","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.742024,"lon":-73.986164},{"id":"M080097","n":"Saratoga","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.769798,"lon":-73.955251},{"id":"M050015","n":"","t":"Arcade; Covered Pedestrian Space; Seating Area; Through Block Arcade; Urban Plaza","h":"24 Hours; Closing for Events; Restricted Hours","s":1,"i":1,"r":1,"lat":40.762105,"lon":-73.973042},{"id":"M050031","n":"CBS","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.761227,"lon":-73.978746},{"id":"M080053","n":"Continental Towers","t":"Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.773327,"lon":-73.954245},{"id":"M050110","n":"Hotel Eventi","t":"Public Plaza; Urban Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.747129,"lon":-73.990281},{"id":"M050102","n":"London Hotel","t":"Through Block Connection","h":"Restricted Hours","s":0,"i":1,"r":1,"lat":40.763503,"lon":-73.980463},{"id":"M010006","n":"Two Federal Reserve Plaza","t":"Covered Pedestrian Space; Public Pedestrian Circulation Area","h":"24 Hours; Restricted Hours","s":1,"i":1,"r":1,"lat":40.709123,"lon":-74.00848},{"id":"M010032","n":"","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.703347,"lon":-74.01373},{"id":"M040013","n":"Clinton Green","t":"Linear Open Space; Open Space","h":"","s":0,"i":0,"r":0,"lat":40.766241,"lon":-73.991004},{"id":"M070006","n":"One Sherman Square","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.777798,"lon":-73.982788},{"id":"M080030","n":"Stratford","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.768013,"lon":-73.953411},{"id":"M050060","n":"Bell Atlantic","t":"Special Permit Plaza; Subway Concourse","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.754754,"lon":-73.985006},{"id":"M060029","n":"","t":"Sidewalk Widening; Urban Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.755012,"lon":-73.971785},{"id":"M070013","n":"","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.772399,"lon":-73.979753},{"id":"M010046","n":"J.P. Morgan","t":"Arcade; Covered Pedestrian Space","h":"24 Hours; Closing for Events; Restricted Hours","s":1,"i":1,"r":1,"lat":40.706241,"lon":-74.008505},{"id":"M080015","n":"Normandie Court","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.78468,"lon":-73.94924},{"id":"M020007","n":"Astor Place","t":"Residential Plaza; Unbonused Open Space","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.729513,"lon":-73.991236},{"id":"M060066","n":"","t":"Arcade; Residential Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.7531,"lon":-73.967642},{"id":"M010015","n":"","t":"Arcade; Plaza","h":"","s":0,"i":1,"r":0,"lat":40.704265,"lon":-74.006997},{"id":"M060017","n":"The Nash","t":"Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.748203,"lon":-73.974848},{"id":"M050072","n":"","t":"Public Access Areas; Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.740536,"lon":-73.984335},{"id":"M050089","n":"","t":"Urban Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.758495,"lon":-73.974123},{"id":"M080023","n":"","t":"Plaza","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.769607,"lon":-73.957212},{"id":"M080101","n":"The Easton","t":"Non-Bonused Open Area; Public Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.782666,"lon":-73.95031},{"id":"M060011","n":"Park Towers Medical Plaza","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.735365,"lon":-73.985267},{"id":"M060058","n":"","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.758963,"lon":-73.967589},{"id":"M050011","n":"","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.765361,"lon":-73.980881},{"id":"M060040","n":"","t":"Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.751016,"lon":-73.973869},{"id":"M050027","n":"Tower 53","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.762998,"lon":-73.981279},{"id":"M080057","n":"Adams Tower","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.775988,"lon":-73.950441},{"id":"M040002","n":"Colonnade","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.767961,"lon":-73.984574},{"id":"M080062","n":"Waterford","t":"Residential Plaza","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.781993,"lon":-73.948325},{"id":"M050054","n":"","t":"Arcade; Sidewalk Widening; Urban Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.756672,"lon":-73.98336},{"id":"M060090","n":"Alexandria Science Center","t":"Public Access Area","h":"","s":0,"i":0,"r":0,"lat":40.739922,"lon":-73.974328},{"id":"M010050","n":"Two Gold","t":"Urban Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.70741,"lon":-74.006932},{"id":"M060022","n":"New York Tower","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.747088,"lon":-73.972452},{"id":"M070017","n":"Lincoln Plaza Towers","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.77073,"lon":-73.983133},{"id":"M050038","n":"Paramount Plaza","t":"Special Permit Arcade; Special Permit Plaza; Underground Concourse","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.762107,"lon":-73.984702},{"id":"M040009","n":"River Place","t":"Major Public Open Space; Public Open Space","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.761271,"lon":-74.000466},{"id":"M050039","n":"New York Palace Hotel","t":"Courtyard","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.758249,"lon":-73.975},{"id":"M050021","n":"Alliance Capital","t":"Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.763064,"lon":-73.979254},{"id":"M060047","n":"1 Dag Hammarskjold Plaza","t":"Additional Plaza; Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.753494,"lon":-73.970226},{"id":"M060073","n":"Rivercourt","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.754935,"lon":-73.963696},{"id":"M080011","n":"Concorde","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.76444,"lon":-73.962659},{"id":"M020002","n":"","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.730071,"lon":-73.993444},{"id":"M060006","n":"","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.745467,"lon":-73.978675},{"id":"M080005","n":"Phoenix","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.765124,"lon":-73.964391},{"id":"M070016","n":"The Harmony/David Rubenstein Atrium","t":"Covered Plaza","h":"Closing for Events; Restricted Hours","s":1,"i":1,"r":1,"lat":40.771115,"lon":-73.982837},{"id":"M060034","n":"","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.760198,"lon":-73.968094},{"id":"M060052","n":"","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.755906,"lon":-73.970095},{"id":"M010049","n":"","t":"Urban Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.708374,"lon":-74.005634},{"id":"M110003","n":"Sendero Verde","t":"Public Access Area","h":"","s":0,"i":0,"r":0,"lat":40.796772,"lon":-73.946059},{"id":"M060078","n":"Sovereign","t":"Open Space; Plaza","h":"24 Hours; Restricted Hours","s":1,"i":0,"r":1,"lat":40.758736,"lon":-73.960947},{"id":"M040003","n":"Sheffield","t":"Arcade; Plaza","h":"24 Hours; Restricted Hours","s":1,"i":1,"r":1,"lat":40.766825,"lon":-73.984238},{"id":"M050116","n":"","t":"Pedestrian Circulation Space","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.755982,"lon":-73.97599},{"id":"M110004","n":"East Harlem MECC","t":"Public Plaza","h":"","s":0,"i":0,"r":0,"lat":40.804311,"lon":-73.93422},{"id":"M060021","n":"Corinthian","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.746328,"lon":-73.97272},{"id":"M080082","n":"","t":"Park-Like Open Space; Plaza; Variance Arcade","h":"24 Hours; Restricted Hours","s":0,"i":1,"r":1,"lat":40.768406,"lon":-73.960545},{"id":"M050007","n":"Galleria","t":"Covered Pedestrian Space","h":"Restricted Hours","s":1,"i":1,"r":1,"lat":40.761711,"lon":-73.969757},{"id":"M080040","n":"Park Lane Towers","t":"Plaza; Plaza- Connected Open Area","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.778669,"lon":-73.954732},{"id":"M070030","n":"Fordham University","t":"Interim Open Space","h":"","s":0,"i":0,"r":0,"lat":40.770871,"lon":-73.984295},{"id":"M060065","n":"Dag Hammarskjold Plaza","t":"Arcade","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.752483,"lon":-73.96992},{"id":"M080058","n":"America","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.776864,"lon":-73.952051},{"id":"M010014","n":"","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.704676,"lon":-74.007581},{"id":"M010024","n":"100 Pearl Street","t":"Arcade; Through Block Arcade","h":"24 Hours; Restricted Hours","s":1,"i":1,"r":1,"lat":40.704056,"lon":-74.009659},{"id":"M050068","n":"Two Penn Plaza/Madison Square Garden","t":"Plaza (C6-2); Plaza (C6-4)","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.749981,"lon":-73.992132},{"id":"M070023","n":"Tower 67","t":"Residential Plaza","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.775567,"lon":-73.983341},{"id":"M010059","n":"Mandarin Plaza","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.717714,"lon":-74.002814},{"id":"M050106","n":"Avenue of the Americas Plaza","t":"Through Block Connection","h":"Restricted Hours","s":0,"i":1,"r":1,"lat":40.763747,"lon":-73.978951},{"id":"M060084","n":"Carlton Regency North","t":"Variance Arcade","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.748033,"lon":-73.978151},{"id":"M010007","n":"","t":"Covered Pedestrian Space","h":"Restricted Hours","s":1,"i":1,"r":1,"lat":40.708346,"lon":-74.007199},{"id":"M050043","n":"McGraw-Hill","t":"Plaza; Sunken Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.759381,"lon":-73.982067},{"id":"M050074","n":"CitySpire","t":"Building Entrance Recess Area; Through Block Connection","h":"24 Hours; Restricted Hours","s":0,"i":1,"r":1,"lat":40.764241,"lon":-73.979745},{"id":"M010019","n":"","t":"Arcade","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.705277,"lon":-74.011047},{"id":"M040012","n":"HFZ Plaza","t":"At-Grade Plaza","h":"","s":0,"i":0,"r":0,"lat":40.7447,"lon":-74.00742},{"id":"M060030","n":"","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.755635,"lon":-73.971355},{"id":"M060057","n":"Brevard","t":"Plaza; Residential Plaza","h":"24 Hours; Restricted Hours","s":1,"i":0,"r":1,"lat":40.757849,"lon":-73.966795},{"id":"M050111","n":"","t":"Public Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.747406,"lon":-73.983637},{"id":"M080073","n":"","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.772792,"lon":-73.946952},{"id":"M010054","n":"30 Park Place","t":"Public Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.712776,"lon":-74.009036},{"id":"M050002","n":"Park Lane Hotel","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.764811,"lon":-73.97538},{"id":"M080034","n":"Park Regis","t":"Landscaped Open Area; Plaza (Park-Like Open Space)","h":"24 Hours; Restricted Hours","s":1,"i":0,"r":1,"lat":40.78221,"lon":-73.956936},{"id":"M080029","n":"Windsor","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.766642,"lon":-73.956257},{"id":"M070007","n":"Nevada Towers","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.77681,"lon":-73.982543},{"id":"M060025","n":"Manhattan Place","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.745155,"lon":-73.971836},{"id":"M080016","n":"","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.768919,"lon":-73.959739},{"id":"M050064","n":"One Penn Plaza","t":"Arcade; Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.751263,"lon":-73.992374},{"id":"M050101","n":"United States Trust","t":"Through Block Connection","h":"Restricted Hours","s":0,"i":1,"r":1,"lat":40.75814,"lon":-73.983038},{"id":"M010042","n":"","t":"Arcade; Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.7056,"lon":-74.015837},{"id":"M080068","n":"","t":"Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.77588,"lon":-73.947885},{"id":"M050078","n":"Saks Tower","t":"Building Entrance Recess Area; Special Permit Pedestrian Circulation Sp","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.757966,"lon":-73.976816},{"id":"M050048","n":"Stevens Tower","t":"Basement Concourse; Landscaped Pedestrian Plaza; Special Permit Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.757899,"lon":-73.982519},{"id":"M050014","n":"Trump Tower","t":"Covered Pedestrian Space; Landscaped Terraces; Passageway","h":"Closing for Events; Restricted Hours","s":1,"i":1,"r":1,"lat":40.762311,"lon":-73.973894},{"id":"M080033","n":"Park 900","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.776088,"lon":-73.960695},{"id":"M060061","n":"International Plaza","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.75056,"lon":-73.971256},{"id":"M050030","n":"","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.761768,"lon":-73.980027},{"id":"M060026","n":"Grand Central Plaza","t":"Arcade; Landscaped Terrace; Plaza; Through Block Arcade; Urban Plaza","h":"24 Hours; Restricted Hours","s":1,"i":1,"r":1,"lat":40.75008,"lon":-73.975876},{"id":"M080046","n":"Wimbledon","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.775905,"lon":-73.955688},{"id":"M020006","n":"The Dominick","t":"Arcade; Urban Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.725306,"lon":-74.005408},{"id":"M050107","n":"The Capitol at Chelsea","t":"Urban Plaza","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.744914,"lon":-73.990772},{"id":"M060012","n":"Crystal House","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.739149,"lon":-73.982513},{"id":"M040016","n":"Hudson Yards / Manhattan West (Subarea B2)","t":"Art Plaza; Central Plaza; Entry Plaza","h":"","s":0,"i":0,"r":0,"lat":40.752087,"lon":-73.997957},{"id":"M050083","n":"1325 Avenue of the Americas","t":"Through Block Galleria","h":"Restricted Hours","s":1,"i":1,"r":1,"lat":40.76288,"lon":-73.980702},{"id":"M050035","n":"Olympic Tower","t":"Covered Pedestrian Space","h":"Restricted Hours","s":1,"i":1,"r":1,"lat":40.759199,"lon":-73.976086},{"id":"M010027","n":"4 New York Plaza","t":"Arcade; Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.702777,"lon":-74.010722},{"id":"M080094","n":"Strathmore","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.775165,"lon":-73.950164},{"id":"M050040","n":"","t":"Arcade; Covered Pedestrian Space; Public Access Area","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.756859,"lon":-73.97264},{"id":"M020001","n":"Georgetown Plaza","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.730499,"lon":-73.993076},{"id":"M050034","n":"","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.757754,"lon":-73.972426},{"id":"M080051","n":"","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.78099,"lon":-73.951976},{"id":"M060039","n":"New York Helmsley Hotel","t":"Urban Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.750107,"lon":-73.973982},{"id":"M050010","n":"Carnegie Mews","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.765474,"lon":-73.98147},{"id":"M060048","n":"","t":"Arcade; Urban Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.754219,"lon":-73.971406},{"id":"M060074","n":"River Tower","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.755676,"lon":-73.96353},{"id":"M080072","n":"Caldwell","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.772184,"lon":-73.949394},{"id":"M060005","n":"Dumont Plaza","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.745895,"lon":-73.979288},{"id":"M080010","n":"Carlton Towers","t":"Plaza","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.764339,"lon":-73.964081},{"id":"M070024","n":"Bel Canto","t":"Covered Plaza","h":"Restricted Hours","s":1,"i":1,"r":1,"lat":40.775276,"lon":-73.982637},{"id":"M050075","n":"Flatotel","t":"Through Block Galleria","h":"Restricted Hours","s":1,"i":1,"r":1,"lat":40.762046,"lon":-73.980893},{"id":"M010018","n":"","t":"Arcade; Urban Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.706021,"lon":-74.011787},{"id":"M010020","n":"1 Exchange Plaza","t":"Other Public Access Areas; Urban Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.706855,"lon":-74.013024},{"id":"M050055","n":"","t":"Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.756057,"lon":-73.983866},{"id":"M060072","n":"Landmark","t":"Arcade; Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.760167,"lon":-73.964228},{"id":"M010031","n":"","t":"Arcade; Public Exhibit Space; Sidewalk Widening; Urban Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.702892,"lon":-74.013878},{"id":"M050069","n":"New York Merchandise Mart","t":"Arcade; Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.742383,"lon":-73.986269},{"id":"M060088","n":"","t":"Urban Plaza","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.752246,"lon":-73.974948},{"id":"M010053","n":"New York by Gehry","t":"Non-Bonused Open Area; Porte Cochere; Urban Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.71097,"lon":-74.005677},{"id":"M050090","n":"Millennium Broadway","t":"Through Block Connection","h":"Restricted Hours","s":0,"i":1,"r":1,"lat":40.757155,"lon":-73.984645},{"id":"M070021","n":"Trump International Hotel and Tower","t":"Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.769108,"lon":-73.981621},{"id":"M010003","n":"One Bankers Trust Plaza","t":"Arcade; Elevated Plaza; Elevated Shopping Way; Pedestrian Bridge; Pedestrian Connection; Plaza; Shopping Arcade","h":"24 Hours; Restricted Hours","s":1,"i":1,"r":1,"lat":40.709616,"lon":-74.013389},{"id":"M050057","n":"Grace","t":"Arcade; Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.754825,"lon":-73.982848},{"id":"M080100","n":"Bridge Tower Place","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.760375,"lon":-73.960679},{"id":"M050086","n":"Park Avenue Tower","t":"Urban Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.760886,"lon":-73.972133},{"id":"M050104","n":"Morgan Stanley Building","t":"Through Block Connection","h":"Restricted Hours","s":0,"i":1,"r":1,"lat":40.759977,"lon":-73.985507},{"id":"M010008","n":"","t":"Arcade; Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.70741,"lon":-74.004736},{"id":"M010030","n":"1 State Street Plaza","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.70276,"lon":-74.013301},{"id":"M070009","n":"","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.774012,"lon":-73.978139},{"id":"M070015","n":"30 Lincoln Plaza","t":"Covered Plaza; Landscaped Plaza; Mandatory Arcade; Special Permit Arcade","h":"24 Hours; Restricted Hours","s":1,"i":1,"r":1,"lat":40.770769,"lon":-73.981573},{"id":"M010048","n":"Tribeca Tower","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.71582,"lon":-74.005977},{"id":"M050024","n":"Warburg Dillon Read","t":"Arcade; Urban Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.76043,"lon":-73.973277},{"id":"M060091","n":"East River Realty North","t":"Public Access Area","h":"","s":0,"i":0,"r":0,"lat":40.747403,"lon":-73.971413},{"id":"M060003","n":"Windsor Court","t":"Residential Plaza","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.744476,"lon":-73.980112},{"id":"M060064","n":"Delegate","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.751775,"lon":-73.970372},{"id":"M010013","n":"","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.705244,"lon":-74.006755},{"id":"M010060","n":"","t":"Public Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.709112,"lon":-74.006345},{"id":"M010043","n":"","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.708631,"lon":-74.014659},{"id":"M080012","n":"Bristol","t":"Residential Plaza","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.764775,"lon":-73.963557},{"id":"M050051","n":"Madison Belvedere","t":"Residential Plaza","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.744642,"lon":-73.986214},{"id":"M010037","n":"Salomon Smith Barney","t":"Plaza; Public Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.720865,"lon":-74.011003},{"id":"M080041","n":"","t":"Arcade; Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.779485,"lon":-73.956624},{"id":"M060038","n":"Vanderbilt","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.74921,"lon":-73.973675},{"id":"M050091","n":"Marriott Marquis","t":"Broadway Plaza; Covered Public Pedestrian Area; Interior Spaces; Shubert Alley Extension","h":"24 Hours; Restricted Hours","s":0,"i":1,"r":1,"lat":40.758627,"lon":-73.986197},{"id":"M080059","n":"Corniche","t":"Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.77861,"lon":-73.950797},{"id":"M040004","n":"One Worldwide Plaza","t":"Elliptical Arcades; Plaza; Subway Access Areas","h":"24 Hours; Restricted Hours","s":1,"i":1,"r":1,"lat":40.76223,"lon":-73.986943},{"id":"M050067","n":"","t":"Arcade; Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.747774,"lon":-73.987874},{"id":"M050100","n":"Bertelsmann","t":"Through Block Connection","h":"Restricted Hours","s":0,"i":1,"r":1,"lat":40.758432,"lon":-73.98515},{"id":"M050082","n":"","t":"Urban Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.750812,"lon":-73.983336},{"id":"M050018","n":"Sony","t":"Arcade; Covered Pedestrian Space","h":"24 Hours; Closing for Events; Restricted Hours","s":1,"i":1,"r":1,"lat":40.761462,"lon":-73.973504},{"id":"M060020","n":"","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.744286,"lon":-73.975684},{"id":"M060083","n":"Carlton Regency","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.747756,"lon":-73.978378},{"id":"M030001","n":"","t":"Open Space","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.730068,"lon":-73.990168},{"id":"M080102","n":"Cornell Tech","t":"Public Access Area","h":"","s":0,"i":0,"r":0,"lat":40.755487,"lon":-73.956228},{"id":"M060031","n":"","t":"Open Space and Sidewalk Widenings","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.757866,"lon":-73.970752},{"id":"M080075","n":"Evansview","t":"Residential Plaza","h":"Restricted Hours","s":0,"i":0,"r":1,"lat":40.761347,"lon":-73.963184},{"id":"M020004","n":"","t":"Park","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.738442,"lon":-74.008596},{"id":"M060049","n":"","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.754712,"lon":-73.971092},{"id":"M080019","n":"Paladin","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.762203,"lon":-73.96279},{"id":"M010025","n":"","t":"Arcade; Elevated Plaza; Plaza","h":"24 Hours; Closing for Events; Restricted Hours","s":1,"i":1,"r":1,"lat":40.703183,"lon":-74.009154},{"id":"M050003","n":"General Motors Building","t":"Arcade; Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.763609,"lon":-73.972435},{"id":"M080001","n":"Plaza Tower","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.762812,"lon":-73.968648},{"id":"M060079","n":"","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.746466,"lon":-73.97923},{"id":"M060008","n":"Murray Hill House","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.746873,"lon":-73.979696},{"id":"M080054","n":"East Winds","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.773469,"lon":-73.952306},{"id":"M080085","n":"Marmara Manhattan","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.782975,"lon":-73.947598},{"id":"M050008","n":"Solow","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.763886,"lon":-73.974991},{"id":"M080027","n":"Kingsley","t":"Residential Plaza","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.76614,"lon":-73.956792},{"id":"M050047","n":"1211 Avenue of the Americas","t":"Plaza; Subway Concourse; Through Block Arcade","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.758664,"lon":-73.982399},{"id":"M060014","n":"Parc East Tower Apartments","t":"Mini-Park; Public Open Area","h":"24 Hours; Restricted Hours","s":1,"i":0,"r":1,"lat":40.740247,"lon":-73.97964},{"id":"M040011","n":"","t":"Public Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.753821,"lon":-73.992669},{"id":"M010055","n":"","t":"Public Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.710451,"lon":-74.00597},{"id":"M060044","n":"Dag Hammarskjold Tower","t":"Non-Bonused Space; Residential Plaza","h":"24 Hours; Restricted Hours","s":1,"i":0,"r":1,"lat":40.752857,"lon":-73.970433},{"id":"M060056","n":"","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.758299,"lon":-73.967903},{"id":"M050063","n":"World Apparel Center","t":"Arcade; Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.754194,"lon":-73.987566},{"id":"M050112","n":"432 Park Avenue","t":"Public Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.7615,"lon":-73.971797},{"id":"M050013","n":"","t":"Plaza; Through Block Arcade","h":"24 Hours; Restricted Hours","s":0,"i":1,"r":1,"lat":40.763549,"lon":-73.976359},{"id":"M080035","n":"","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.782968,"lon":-73.956669},{"id":"M050036","n":"","t":"Cellar Floor Public Space; Covered Pedestrian Space","h":"Restricted Hours","s":1,"i":1,"r":1,"lat":40.75977,"lon":-73.976804},{"id":"M060087","n":"New Yorker East","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.75847,"lon":-73.961984},{"id":"M060024","n":"Churchill","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.748002,"lon":-73.972838},{"id":"M080004","n":"Royale","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.764499,"lon":-73.964843},{"id":"M050041","n":"","t":"Arcade; Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.75737,"lon":-73.975394},{"id":"M070026","n":"Concerto","t":"Public Open Space","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.770898,"lon":-73.987797},{"id":"M060027","n":"Two Grand Central Tower","t":"Arcade; Sidewalk Widening; Urban Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.752748,"lon":-73.9741},{"id":"M060075","n":"Revere","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.756003,"lon":-73.964003},{"id":"M060045","n":"L'Ecole","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.753272,"lon":-73.971659},{"id":"M020012","n":"","t":"Pedestrian Circulation Space; Public Plaza","h":"","s":0,"i":0,"r":0,"lat":40.726794,"lon":-73.997954},{"id":"M050076","n":"","t":"Access Area; Exhibit Area; Pedestrian Circulation Space","h":"24 Hours; Restricted Hours","s":0,"i":0,"r":1,"lat":40.762294,"lon":-73.975103},{"id":"M010021","n":"","t":"Through Block Arcade Equivalent","h":"Restricted Hours","s":0,"i":1,"r":1,"lat":40.706485,"lon":-74.012274},{"id":"M050070","n":"Madison Green","t":"Residential Plaza","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.740794,"lon":-73.988889},{"id":"M080099","n":"International Plaza","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.762669,"lon":-73.968262},{"id":"M060060","n":"UNICEF House","t":"Urban Plaza","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.750285,"lon":-73.969853},{"id":"M060009","n":"Murray Hill Mews","t":"Plaza","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.748093,"lon":-73.976866},{"id":"M050017","n":"","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.747028,"lon":-73.995362},{"id":"M080050","n":"Monarch","t":"Residential Plaza","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.78051,"lon":-73.952402},{"id":"M050029","n":"","t":"Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.762913,"lon":-73.982525},{"id":"M080066","n":"Dunhill","t":"Open Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.775565,"lon":-73.949915},{"id":"M050108","n":"Museum of Modern Art","t":"Building Entrance Recess Areas; Through Block Lobby","h":"Closing for Events; Restricted Hours","s":0,"i":1,"r":1,"lat":40.761276,"lon":-73.976742},{"id":"M050052","n":"","t":"Arcade; Plaza; Through Block Plaza","h":"24 Hours; Restricted Hours","s":1,"i":1,"r":1,"lat":40.75682,"lon":-73.981851},{"id":"M010034","n":"Financial Square","t":"Arcade; Sidewalk Widening; Urban Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.703809,"lon":-74.007693},{"id":"M010052","n":"","t":"Public Open Space","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.707761,"lon":-74.014994},{"id":"M070020","n":"Beaumont","t":"Additional Residential Plaza; Arcade; Residential Plaza","h":"24 Hours; Restricted Hours","s":1,"i":1,"r":1,"lat":40.769989,"lon":-73.983295},{"id":"M010004","n":"One Liberty Plaza","t":"Open Area; Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.709216,"lon":-74.011257},{"id":"M060092","n":"East River Realty South","t":"Public Access Area","h":"","s":0,"i":0,"r":0,"lat":40.744458,"lon":-73.971941},{"id":"M050058","n":"Emigrant Savings Bank","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.753507,"lon":-73.979798},{"id":"M040015","n":"","t":"Public Access Area","h":"","s":0,"i":0,"r":0,"lat":40.753045,"lon":-73.999448},{"id":"M080032","n":"","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.777261,"lon":-73.96315},{"id":"M060070","n":"Morrison","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.758202,"lon":-73.963359},{"id":"M080009","n":"Wellington Estates","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.763016,"lon":-73.965078},{"id":"M010038","n":"Liberty Tower","t":"Pedestrian Circulation Space; Urban Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.707363,"lon":-74.008195},{"id":"M010056","n":"","t":"Public Access Area; Public Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.713726,"lon":-74.009794},{"id":"M050113","n":"","t":"Public Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.745677,"lon":-73.989083},{"id":"M050087","n":"Bear Stearns","t":"Building Entrance Recess Area; New North End Access to 47th Street Cro; Off-Street Rail Mass Transit Access; Through Block Connection","h":"24 Hours; Restricted Hours","s":0,"i":1,"r":1,"lat":40.755469,"lon":-73.976726},{"id":"M050092","n":"","t":"Arcade","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.752999,"lon":-73.980759},{"id":"M080036","n":"Carnegie Hill Tower","t":"Access to Public Open Area; Public Open Area","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.785523,"lon":-73.954963},{"id":"M010002","n":"","t":"Pedestrian Easement; Public Lobby","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.71451,"lon":-74.012236},{"id":"M080093","n":"","t":"Arcade","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.783875,"lon":-73.946954},{"id":"M050033","n":"Park Avenue Plaza","t":"Through Block Arcade","h":"Restricted Hours","s":1,"i":1,"r":1,"lat":40.759124,"lon":-73.973671},{"id":"M080044","n":"Highgate","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.784371,"lon":-73.950341},{"id":"M080071","n":"Austen House","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.771028,"lon":-73.948828},{"id":"M010017","n":"10 Hanover Square","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.704569,"lon":-74.008858},{"id":"M080042","n":"Carlton Park","t":"Arcade; Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.780871,"lon":-73.956255},{"id":"M050062","n":"Fifth Avenue Tower","t":"Urban Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.751588,"lon":-73.981752},{"id":"M010061","n":"Pier 17","t":"Public Access Area","h":"","s":0,"i":0,"r":0,"lat":40.705442,"lon":-74.001482},{"id":"M050085","n":"Metropolitan Tower","t":"Through Block Connection; Urban Plaza","h":"24 Hours; Restricted Hours","s":1,"i":1,"r":1,"lat":40.764719,"lon":-73.97929},{"id":"M080013","n":"","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.765598,"lon":-73.96142},{"id":"M050050","n":"","t":"Arcade; Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.754626,"lon":-73.974723},{"id":"M010029","n":"","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.702153,"lon":-74.012021},{"id":"M070014","n":"One Lincoln Plaza","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.771515,"lon":-73.981407},{"id":"M060055","n":"","t":"Pedestrian Circulation Space","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.757885,"lon":-73.968777},{"id":"M060032","n":"Citigroup Center","t":"Covered Pedestrian Space; Open Air Concourse; Plaza; Through Block Arcade","h":"24 Hours; Closing for Events; Restricted Hours","s":1,"i":1,"r":1,"lat":40.758398,"lon":-73.970037},{"id":"M050004","n":"500 Park Tower","t":"Arcade; Sidewalk Widening; Urban Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.762894,"lon":-73.970356},{"id":"M080076","n":"Belaire","t":"Residential Plaza","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.765855,"lon":-73.952478},{"id":"M040007","n":"","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.766509,"lon":-73.985054},{"id":"M060002","n":"Biltmore Plaza","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.742964,"lon":-73.98057},{"id":"M060019","n":"Highpoint","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.74854,"lon":-73.973654},{"id":"M050009","n":"","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.764458,"lon":-73.976351},{"id":"M080086","n":"Trump Palace","t":"Residential Plaza","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.767289,"lon":-73.961762},{"id":"M080021","n":"Rio","t":"Residential Plaza","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.763976,"lon":-73.961461},{"id":"M010026","n":"2 New York Plaza","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.702266,"lon":-74.010607},{"id":"M080002","n":"Trump Plaza","t":"Residential Plaza","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.763253,"lon":-73.965768},{"id":"M010012","n":"","t":"Arcade","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.70491,"lon":-74.006355},{"id":"M060063","n":"Lausanne","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.751336,"lon":-73.969239},{"id":"M050066","n":"","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.745402,"lon":-73.982089},{"id":"M080060","n":"Plymouth Tower","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.781182,"lon":-73.946704},{"id":"M050097","n":"","t":"Public Plaza; Underground Passageway","h":"Restricted Hours","s":1,"i":1,"r":1,"lat":40.76052,"lon":-73.982843},{"id":"M010044","n":"Bank of New York","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.707121,"lon":-74.01183},{"id":"M050019","n":"1370 Avenue of the Americas","t":"Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.763275,"lon":-73.977471},{"id":"M050081","n":"Ritz","t":"Urban Plaza","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.760894,"lon":-73.986092},{"id":"M050046","n":"Westvaco","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.756014,"lon":-73.974138},{"id":"M010009","n":"","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.706996,"lon":-74.005544},{"id":"M020003","n":"Saatchi & Saatchi","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.728482,"lon":-74.007923},{"id":"M050025","n":"","t":"Sidewalk Widening; Urban Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.760258,"lon":-73.974476},{"id":"M010047","n":"Millenium Hilton Hotel","t":"Sidewalk Widening; Urban Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.71114,"lon":-74.010244},{"id":"M090001","n":"Manhattanville","t":"Grove; Large Square; Midblock Open Area; Small Square","h":"","s":0,"i":0,"r":0,"lat":40.817859,"lon":-73.958615},{"id":"M060037","n":"Marlborough","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.748957,"lon":-73.973343},{"id":"M060050","n":"Sterling Plaza","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.754635,"lon":-73.96906},{"id":"M060007","n":"Murray Hill","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.746892,"lon":-73.980165},{"id":"M060081","n":"Grand Sutton","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.759066,"lon":-73.961258},{"id":"M080055","n":"Camargue","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.776028,"lon":-73.952651},{"id":"M030002","n":"citizenM Bowery","t":"Public Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.720604,"lon":-73.993499},{"id":"M060015","n":"Laurence Tower","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.744616,"lon":-73.97848},{"id":"M070011","n":"Toulaine","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.774875,"lon":-73.983233},{"id":"M050059","n":"Philip Morris","t":"Arcade; Covered Pedestrian Space","h":"24 Hours; Restricted Hours","s":1,"i":1,"r":1,"lat":40.751928,"lon":-73.978305},{"id":"M070027","n":"West End Towers","t":"Public Open Spaces","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.773792,"lon":-73.989403},{"id":"M080014","n":"","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.766067,"lon":-73.960813},{"id":"M010022","n":"45 Broadway Atrium","t":"Arcade; Shopping Arcade","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.706542,"lon":-74.013266},{"id":"M050077","n":"Carnegie Hall Tower","t":"Through Block Connection","h":"Restricted Hours","s":0,"i":1,"r":1,"lat":40.765619,"lon":-73.979954},{"id":"M060067","n":"Connaught Tower","t":"Park; Plaza","h":"24 Hours; Restricted Hours","s":1,"i":0,"r":1,"lat":40.756954,"lon":-73.966399},{"id":"M050053","n":"One Astor Place","t":"Pedestrian Thoroughfare; Shubert Alley","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.757929,"lon":-73.986439},{"id":"M010016","n":"","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.704226,"lon":-74.008198},{"id":"M010040","n":"","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.708659,"lon":-74.007982},{"id":"M050103","n":"","t":"Pedestrian Circulation Space; Urban Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.750965,"lon":-73.982199},{"id":"M050093","n":"Ascot","t":"Residential Plaza","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.743374,"lon":-73.983627},{"id":"M010005","n":"","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.70865,"lon":-74.010117},{"id":"M060082","n":"Rivergate","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.743838,"lon":-73.972537},{"id":"M080098","n":"Oxford","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.766853,"lon":-73.955026},{"id":"M080003","n":"","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.777041,"lon":-73.963201},{"id":"M060010","n":"","t":"Arcade; Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.749359,"lon":-73.975952},{"id":"M080031","n":"Somerset","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.76741,"lon":-73.953899},{"id":"M050012","n":"Le Parker Meridien Hotel","t":"Plaza; Through Block Arcade","h":"24 Hours; Restricted Hours","s":1,"i":1,"r":1,"lat":40.764263,"lon":-73.978481},{"id":"M060041","n":"","t":"Augmented Sidewalk; Vest Pocket Park","h":"24 Hours; Restricted Hours","s":1,"i":0,"r":1,"lat":40.751581,"lon":-73.973331},{"id":"M060046","n":"","t":"Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.75348,"lon":-73.972049},{"id":"M070019","n":"Regent","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.769943,"lon":-73.983711},{"id":"M050032","n":"HarperCollins","t":"Plaza; Through Block Arcade","h":"24 Hours; Restricted Hours","s":1,"i":1,"r":1,"lat":40.759813,"lon":-73.975317},{"id":"M050042","n":"1251 Avenue of the Americas","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.759971,"lon":-73.981612},{"id":"M080049","n":"Claridge House","t":"Park; Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.779615,"lon":-73.95284},{"id":"M060076","n":"St. James Tower","t":"Residential Plaza","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.756151,"lon":-73.963014},{"id":"M080070","n":"East River Towers","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.778319,"lon":-73.94598},{"id":"M020011","n":"NYU Core","t":"Public Access Area","h":"","s":0,"i":0,"r":0,"lat":40.728076,"lon":-73.997197},{"id":"M050109","n":"","t":"Residential Plaza","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.747329,"lon":-73.98486},{"id":"M040014","n":"Hudson Yards Eastern Rail Yards Subarea A1","t":"Covered Pedestrian Space; Public Access Area","h":"","s":0,"i":1,"r":0,"lat":40.753267,"lon":-74.002841},{"id":"M070005","n":"Gloucester","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.782916,"lon":-73.978901},{"id":"M080037","n":"Kenilworth","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.77489,"lon":-73.95736},{"id":"M050037","n":"PaineWebber","t":"Pedestrian Circulation Space; Sidewalk Widening; Through Block Galleria; Urban Plaza","h":"24 Hours; Restricted Hours","s":1,"i":1,"r":1,"lat":40.761165,"lon":-73.980533},{"id":"M010033","n":"","t":"Arcade; Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.706804,"lon":-74.005879},{"id":"M050071","n":"","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.737289,"lon":-73.993043},{"id":"M050115","n":"","t":"Arcade","h":"Under Construction","s":0,"i":1,"r":0,"lat":40.747409,"lon":-73.988671},{"id":"M010057","n":"One Eleven Murray Street","t":"Public Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.715408,"lon":-74.012593},{"id":"M010051","n":"W Downtown Hotel & Residences","t":"Urban Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.709161,"lon":-74.013714},{"id":"M050088","n":"Deutsche Bank","t":"Urban Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.760925,"lon":-73.978013},{"id":"M060086","n":"Gilman Hall","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.733602,"lon":-73.981432},{"id":"M080089","n":"Normandie Court","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.78426,"lon":-73.948251},{"id":"M040010","n":"","t":"Public Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.755262,"lon":-73.991731},{"id":"M050016","n":"","t":"Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.761495,"lon":-73.971328},{"id":"M060059","n":"Libya House","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.753512,"lon":-73.968588},{"id":"M060028","n":"Cosmopolitan","t":"Pedestrian Circulation Space; Urban Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.755138,"lon":-73.972442},{"id":"M080025","n":"Fairmont","t":"Arcade; Landscaped Park; Plaza","h":"24 Hours; Restricted Hours","s":1,"i":1,"r":1,"lat":40.770262,"lon":-73.956691},{"id":"M080043","n":"Carnegie Towers","t":"Plaza","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.780796,"lon":-73.955598},{"id":"M050028","n":"","t":"Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.763512,"lon":-73.982272},{"id":"M080064","n":"","t":"Residential Plaza","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.773206,"lon":-73.951638},{"id":"M040001","n":"BMW","t":"Arcade; Plaza","h":"24 Hours","s":0,"i":1,"r":0,"lat":40.770402,"lon":-73.990491},{"id":"M080008","n":"Savoy","t":"Residential Plaza","h":"Restricted Hours","s":1,"i":0,"r":1,"lat":40.762366,"lon":-73.965591},{"id":"M060016","n":"","t":"Arcade; Plaza","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.747289,"lon":-73.97495},{"id":"M060023","n":"Whitney","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.747242,"lon":-73.973221},{"id":"M080078","n":"Channel Club","t":"Residential Plaza","h":"24 Hours","s":1,"i":0,"r":0,"lat":40.776355,"lon":-73.947177},{"id":"M060033","n":"","t":"Sidewalk Widening","h":"24 Hours","s":0,"i":0,"r":0,"lat":40.758703,"lon":-73.969094},{"id":"M050005","n":"","t":"Glass-Enclosed Urban Plaza Equivalent; Open Urban Plaza Equivalent; Sidewalk Widening Equivalent; Through Block Arcade Equivalent","h":"24 Hours","s":1,"i":1,"r":0,"lat":40.76254,"lon":-73.969605}];
+</script>
+<script>
+(function(){
+  // ---------- geography ----------
+  const LAT0 = 40.754, LON0 = -73.9815, COSL = Math.cos(LAT0*Math.PI/180);
+  const A = [[0.7992130579647135, -0.435952947828407, -97.97880201860282],
+             [0.0060063537572817025, 0.010988687091122759, 42.373830824588765]];
+  const STREET_M = 79.85;
+  function toUV(lat, lon){
+    const dx = (lon-LON0)*COSL*111320, dy = (lat-LAT0)*110574;
+    return { u: A[0][0]*dx + A[0][1]*dy + A[0][2], v: A[1][0]*dx + A[1][1]*dy + A[1][2] };
+  }
+  function invUV(u, v){
+    const a=A[0][0], b=A[0][1], c=A[1][0], d=A[1][1], det=a*d-b*c;
+    const ru=u-A[0][2], rv=v-A[1][2];
+    const dx=( d*ru - b*rv)/det, dy=(-c*ru + a*rv)/det;
+    return { lat: LAT0 + dy/110574, lon: LON0 + dx/(COSL*111320) };
+  }
+  const ALL = POPS.map(p => Object.assign({}, p, toUV(p.lat, p.lon)));
+
+  const AV = { '9 Av':-1012, '8 Av':-768, '7 Av':-524, '6 Av':-280, '5 Av':0, 'Madison':128, 'Park':253,
+               'Park Av S':253, 'Lex':377, '3 Av':505, '2 Av':691, '1 Av':889, 'York':1079,
+               'CPW':-768, 'Columbus':-1012, 'Amsterdam':-1256, 'West End':-1500 };
+  const WINDOWS = [
+    { name:'Midtown', sub:'39th to 59th Street, Eighth to First Avenue', u0:-900, u1:980, s0:39, s1:59,
+      aves:['8 Av','7 Av','6 Av','5 Av','Madison','Park','Lex','3 Av','2 Av','1 Av'] },
+    { name:'Upper East Side', sub:'59th to 80th Street, Fifth Avenue to York Avenue', u0:-580, u1:1300, s0:59, s1:80,
+      aves:['5 Av','Madison','Park','Lex','3 Av','2 Av','1 Av','York'] },
+    { name:'Upper West Side', sub:'59th to 80th Street, West End Avenue to Central Park', u0:-1750, u1:130, s0:59, s1:80,
+      aves:['West End','Amsterdam','Columbus','CPW'] },
+    { name:'Chelsea to Kips Bay', sub:'23rd to 43rd Street, Ninth to First Avenue', u0:-1060, u1:950, s0:23, s1:43,
+      aves:['9 Av','8 Av','7 Av','6 Av','5 Av','Madison','Park Av S','Lex','3 Av','2 Av','1 Av'] },
+  ];
+
+  // ---------- svg ----------
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.getElementById('map');
+  const el = (t, a, parent) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); (parent||svg).appendChild(e); return e; };
+  let AVENUES, U0, U1, S0, S1, V0, V1, pops, popsEl, gDyn;
+
+  function buildMap(win){
+    U0=win.u0; U1=win.u1; S0=win.s0; S1=win.s1; V0=S0-0.6; V1=S1+0.6;
+    AVENUES = win.aves.map(n => ({n, u:AV[n]}));
+    svg.innerHTML = '';
+    svg.setAttribute('viewBox', `${U0} ${-V1*STREET_M} ${U1-U0} ${(V1-V0)*STREET_M}`);
+    document.getElementById('sub').textContent = `${win.name}, ${win.sub}. Every dot is a privately owned public space.`;
+
+    // City of New York aerial tiles (maps.nyc.gov, CC BY 4.0), rotated onto the grid
+    const gTiles = el('g',{class:'tiles'});
+    const Z = 16, N = 256*Math.pow(2,Z);
+    const merc = (lat, lon) => { const phi=lat*Math.PI/180; return { px:(lon+180)/360*N, py:(1-Math.log(Math.tan(phi)+1/Math.cos(phi))/Math.PI)/2*N }; };
+    function solve3(P, Wv){
+      const [p0,p1,p2]=P, [w0,w1,w2]=Wv;
+      const M=[[p0.px,p0.py,1],[p1.px,p1.py,1],[p2.px,p2.py,1]];
+      const det = M[0][0]*(M[1][1]*M[2][2]-M[1][2]*M[2][1]) - M[0][1]*(M[1][0]*M[2][2]-M[1][2]*M[2][0]) + M[0][2]*(M[1][0]*M[2][1]-M[1][1]*M[2][0]);
+      const inv=[[(M[1][1]*M[2][2]-M[1][2]*M[2][1])/det,(M[0][2]*M[2][1]-M[0][1]*M[2][2])/det,(M[0][1]*M[1][2]-M[0][2]*M[1][1])/det],
+                 [(M[1][2]*M[2][0]-M[1][0]*M[2][2])/det,(M[0][0]*M[2][2]-M[0][2]*M[2][0])/det,(M[0][2]*M[1][0]-M[0][0]*M[1][2])/det],
+                 [(M[1][0]*M[2][1]-M[1][1]*M[2][0])/det,(M[0][1]*M[2][0]-M[0][0]*M[2][1])/det,(M[0][0]*M[1][1]-M[0][1]*M[1][0])/det]];
+      return [inv[0][0]*w0+inv[0][1]*w1+inv[0][2]*w2, inv[1][0]*w0+inv[1][1]*w1+inv[1][2]*w2, inv[2][0]*w0+inv[2][1]*w1+inv[2][2]*w2];
+    }
+    const samples=[{u:U0,v:V0},{u:U1,v:V0},{u:U0,v:V1}];
+    const P=samples.map(s=>{const ll=invUV(s.u,s.v); return merc(ll.lat,ll.lon);});
+    const [a,c,e]=solve3(P, samples.map(s=>s.u));
+    const [b,d,f]=solve3(P, samples.map(s=>-s.v*STREET_M));
+    gTiles.setAttribute('transform', `matrix(${a} ${b} ${c} ${d} ${e} ${f})`);
+    const corners=[{u:U0,v:V0},{u:U1,v:V0},{u:U0,v:V1},{u:U1,v:V1}].map(s=>{const ll=invUV(s.u,s.v); return merc(ll.lat,ll.lon);});
+    const tx0=Math.floor(Math.min(...corners.map(c=>c.px))/256)-1, tx1=Math.floor(Math.max(...corners.map(c=>c.px))/256)+1;
+    const ty0=Math.floor(Math.min(...corners.map(c=>c.py))/256)-1, ty1=Math.floor(Math.max(...corners.map(c=>c.py))/256)+1;
+    let k=0;
+    for (let tx=tx0; tx<=tx1; tx++) for (let ty=ty0; ty<=ty1; ty++){
+      const host = 'https://maps' + ((k++ % 4)+1) + '.nyc.gov';
+      const img = el('image',{x:tx*256, y:ty*256, width:256.5, height:256.5},gTiles);
+      img.setAttribute('href', `${host}/xyz/1.0.0/photo/2018/${Z}/${tx}/${ty}.png8`);
+      img.addEventListener('error', () => img.remove());
+    }
+
+    // grid
+    const gStatic = el('g',{});
+    const ua = AVENUES[0].u, ub = AVENUES[AVENUES.length-1].u;
+    for (let s=S0; s<=S1; s++){
+      el('line',{class:'st',x1:ua,y1:-s*STREET_M,x2:ub,y2:-s*STREET_M},gStatic);
+      if (s%2===1) el('text',{class:'lbl',x:U0+14,y:-s*STREET_M-8},gStatic).textContent = s;
+    }
+    AVENUES.forEach(av => {
+      el('line',{class:'av',x1:av.u,y1:-V0*STREET_M,x2:av.u,y2:-V1*STREET_M},gStatic);
+      el('text',{class:'lbl',x:av.u+10,y:-V1*STREET_M+34},gStatic).textContent = av.n;
+    });
+
+    const gPops = el('g',{});
+    gDyn = el('g',{});
+    pops = ALL.filter(p => p.u>U0+20 && p.u<U1-20 && p.v>V0+0.2 && p.v<V1-0.2);
+    popsEl = {};
+    pops.forEach(p => {
+      const c = el('circle',{class:'pops',cx:p.u,cy:-p.v*STREET_M,r:13},gPops);
+      el('title',{},c).textContent = label(p) + ' — ' + p.t + (p.h?(' — '+p.h):'');
+      popsEl[p.id] = c;
+      c.addEventListener('click', ev => { ev.stopPropagation(); onPopsClick(p); });
+    });
+    document.getElementById('legendCount').textContent = pops.length + ' of 366 privately owned public spaces';
+  }
+  function label(p){ return p.n ? p.n : 'Unnamed space ' + p.id; }
+
+  // ---------- grid graph (x = u meters, y = v*STREET_M meters, north positive) ----------
+  const node = (ai, s) => ({ai, s, x: AVENUES[ai].u, y: s*STREET_M});
+  const sameNode = (a,b) => a.ai===b.ai && a.s===b.s;
+  function nearestNode(x, y){
+    let best=null, bd=1e12;
+    for (let ai=0; ai<AVENUES.length; ai++) for (let s=S0; s<=S1; s++){
+      const d = (AVENUES[ai].u-x)**2 + (s*STREET_M-y)**2;
+      if (d<bd){ bd=d; best=node(ai,s); }
+    }
+    return best;
+  }
+  function neighbors(n){
+    const out=[];
+    if (n.ai>0) out.push(node(n.ai-1,n.s));
+    if (n.ai<AVENUES.length-1) out.push(node(n.ai+1,n.s));
+    if (n.s>S0) out.push(node(n.ai,n.s-1));
+    if (n.s<S1) out.push(node(n.ai,n.s+1));
+    return out;
+  }
+  const dist = (a,b) => Math.hypot(a.x-b.x, a.y-b.y);
+  const l1 = (a,b) => Math.abs(a.x-b.x)+Math.abs(a.y-b.y);
+
+  // ---------- the drawn line (defines start/end only; shown as "the plan") ----------
+  let planPts = null;
+  function pathLen(pts){ let t=0; for(let i=1;i<pts.length;i++) t+=dist(pts[i-1],pts[i]); return t; }
+
+  // ---------- state ----------
+  const WALK_SPEED = 80;         // meters per game-minute
+
+  // Difficulty is set by the game, never by the player. It fixes the length the drawn
+  // swipe must cover (so a trivial short swipe cannot buy an easy score), how far you
+  // can walk before your legs give out, how many seats are offered, and how early
+  // restricted-hours spaces lock for the night.
+  const LEVELS = [
+    { minM: 500,  maxM: 950,  limitM: 16*STREET_M, closeMin: 20*60+30, seatRadius: 460, maxOptions: 6, label:'1 — easy' },
+    { minM: 800,  maxM: 1350, limitM: 14*STREET_M, closeMin: 19*60+45, seatRadius: 400, maxOptions: 5, label:'2' },
+    { minM: 1150, maxM: 1800, limitM: 12*STREET_M, closeMin: 19*60,    seatRadius: 350, maxOptions: 4, label:'3 — standard' },
+    { minM: 1600, maxM: 2350, limitM: 10*STREET_M, closeMin: 18*60+30, seatRadius: 300, maxOptions: 3, label:'4' },
+    { minM: 2150, maxM: 3100, limitM:  8*STREET_M, closeMin: 18*60,    seatRadius: 250, maxOptions: 3, label:'5 — hardest' },
+  ];
+  let difficulty = 3, roundNum = 0;
+  const curLevel = () => LEVELS[difficulty-1];
+
+  const statusEl = document.getElementById('status'), clockEl = document.getElementById('clock'),
+        distEl = document.getElementById('dist'), legsEl = document.getElementById('legs'),
+        controlsEl = document.getElementById('controls'), resultsEl = document.getElementById('results'),
+        historyEl = document.getElementById('history'), diffInfoEl = document.getElementById('diffInfo'),
+        logEl = document.getElementById('log'), logEntries = document.getElementById('logEntries');
+  let S, lastWin = -1;
+  const HISTORY = []; // persists across rounds within this session
+
+  function reset(){
+    let wi; do { wi = Math.floor(Math.random()*WINDOWS.length); } while (WINDOWS.length>1 && wi===lastWin);
+    lastWin = wi; buildMap(WINDOWS[wi]);
+    roundNum++;
+    const lvl = curLevel();
+    S = { phase:'draw', drawing:false, draw:[], start:null, end:null, cur:null, prev:null, path:[], walked:0, sinceSit:0,
+          clock: 18*60+22, sits:[], refused:new Set(), sat:new Set(), blocks:0, options:new Set(), lvl };
+    planPts = null;
+    logEntries.innerHTML=''; logEl.style.display='none';
+    resultsEl.style.display='none'; resultsEl.innerHTML='';
+    diffInfoEl.innerHTML = `<span>round ${roundNum} · difficulty ${lvl.label}</span><span class="attrib">required trip: ${lvl.minM}–${lvl.maxM} m</span>`;
+    render(); say(`Draw your line across the map: press and drag. This round needs a trip of about ${lvl.minM}–${lvl.maxM} meters.`);
+    setControls([]);
+    renderHistory();
+  }
+  const fmtClock = m => { const h=Math.floor(m/60)%24, mm=m%60; const h12=((h+11)%12)+1; return `${h12}:${mm<10?'0':''}${mm} ${h<12?'AM':'PM'}`; };
+  function say(t){ statusEl.textContent = t; }
+  function log(t, cls){
+    logEl.style.display='block';
+    const d=document.createElement('div'); if(cls) d.className=cls;
+    d.innerHTML = `<span class="t">${fmtClock(S.clock)}</span> &nbsp;${t}`;
+    logEntries.appendChild(d); logEl.scrollTop = logEl.scrollHeight;
+  }
+  function setControls(btns){
+    controlsEl.innerHTML='';
+    btns.forEach(b => { const e=document.createElement('button'); e.textContent=b.t; if(b.ghost) e.className='ghost'; e.addEventListener('click', b.f); controlsEl.appendChild(e); });
+  }
+  function render(){
+    gDyn.innerHTML='';
+    const P = pts => pts.map(p=>`${p.x},${-p.y}`).join(' ');
+    if (S.drawing && S.draw.length>1) el('polyline',{class:'plan live',points:P(S.draw)},gDyn);
+    if (planPts) el('polyline',{class:'plan',points:P(planPts)},gDyn);
+    if (S.start && S.end && (S.phase==='walking'||S.phase==='tired'||S.phase==='done'))
+      el('line',{class:'ideal',x1:S.start.x,y1:-S.start.y,x2:S.end.x,y2:-S.end.y},gDyn);
+    if (S.start) el('circle',{class:'endpt',cx:S.start.x,cy:-S.start.y,r:16},gDyn);
+    if (S.end) el('rect',{class:'endpt',x:S.end.x-14,y:-S.end.y-14,width:28,height:28},gDyn);
+    if (S.path.length>1) el('polyline',{class:'walked',points:P(S.path)},gDyn);
+    if (S.phase==='tired' && S.cur) el('circle',{class:'ring',cx:S.cur.x,cy:-S.cur.y,r:350},gDyn);
+    if (S.phase==='walking' && S.cur){
+      neighbors(S.cur).forEach(n => {
+        const c = el('circle',{class:'nextstep',cx:n.x,cy:-n.y,r:13},gDyn);
+        c.addEventListener('click', ev => { ev.stopPropagation(); tryStepTo(n); });
+      });
+    }
+    if (S.cur) el('circle',{class:'walker',cx:S.cur.x,cy:-S.cur.y,r:17},gDyn);
+    clockEl.textContent = fmtClock(S.clock);
+    distEl.textContent = `${S.blocks} block${S.blocks===1?'':'s'}`;
+    const pct = Math.min(100, S.sinceSit/S.lvl.limitM*100);
+    legsEl.firstElementChild.style.width = pct+'%';
+    legsEl.classList.toggle('tired', pct>=100);
+  }
+
+  // ---------- drawing (sets start & end only; free walking happens after) ----------
+  function toWorld(ev){
+    const pt = svg.createSVGPoint(); pt.x=ev.clientX; pt.y=ev.clientY;
+    const w = pt.matrixTransform(svg.getScreenCTM().inverse());
+    return { x: w.x, y: -w.y };
+  }
+  svg.addEventListener('pointerdown', ev => {
+    if (S.phase!=='draw') return;
+    ev.preventDefault(); svg.setPointerCapture(ev.pointerId);
+    S.drawing=true; S.draw=[toWorld(ev)]; render();
+  });
+  svg.addEventListener('pointermove', ev => {
+    if (!S.drawing) return;
+    const p=toWorld(ev), last=S.draw[S.draw.length-1];
+    if (dist(p,last) > 12){ S.draw.push(p); render(); }
+  });
+  function endDraw(){
+    if (!S.drawing) return;
+    S.drawing=false;
+    const pts = S.draw; S.draw=[];
+    if (pts.length<3 || pathLen(pts) < 200){ render(); say('Too short to read. Draw a longer line across the map.'); return; }
+    const cand0 = nearestNode(pts[0].x, pts[0].y), cand1 = nearestNode(pts[pts.length-1].x, pts[pts.length-1].y);
+    if (sameNode(cand0,cand1)){ render(); say('Start and end land on the same corner. Draw a line that goes somewhere.'); return; }
+    const idealM = l1(cand0, cand1), lvl = S.lvl;
+    if (idealM < lvl.minM){ render(); say(`Too short for round ${roundNum} (difficulty ${lvl.label}). This trip needs to cover at least ${lvl.minM} m — yours is ${Math.round(idealM)} m. Draw a longer line.`); return; }
+    if (idealM > lvl.maxM){ render(); say(`Too far for round ${roundNum} (difficulty ${lvl.label}). This trip should stay under ${lvl.maxM} m — yours is ${Math.round(idealM)} m. Draw a shorter line.`); return; }
+    planPts = pts; S.start = cand0; S.end = cand1;
+    S.cur = S.start; S.prev=null; S.path=[S.start]; S.phase='walking';
+    render();
+    log(`Line drawn. Shortest possible route from here: ${Math.round(idealM)} m.`);
+    say('This is your line. The lit corners are where you can step. Choose your own way there — a shortcut is not required.');
+    setControls([{t:'Redraw',f:redraw,ghost:true}]);
+  }
+  svg.addEventListener('pointerup', endDraw);
+  svg.addEventListener('pointercancel', endDraw);
+  function redraw(){
+    planPts=null; S.start=S.end=S.cur=null; S.path=[]; S.phase='draw';
+    logEntries.innerHTML=''; logEl.style.display='none';
+    render(); say('Draw your line across the map: press and drag.'); setControls([]);
+  }
+
+  // ---------- free walking: click any lit neighboring corner to step there ----------
+  function tryStepTo(n){
+    if (S.phase!=='walking') return;
+    if (!neighbors(S.cur).some(nb => sameNode(nb,n))) return;
+    const d = dist(S.cur, n);
+    S.prev=S.cur; S.cur=n; S.path.push(n); S.walked+=d; S.blocks++; S.sinceSit+=d;
+    S.clock += Math.round(d/WALK_SPEED);
+    render();
+    if (sameNode(S.cur, S.end)){ finish(); return; }
+    if (S.sinceSit>=S.lvl.limitM){ becomeTired(); return; }
+  }
+
+  function becomeTired(){
+    S.phase='tired';
+    say('Your legs are done. Every dozen blocks or so you have to sit. Choose somewhere lit.');
+    log('Legs gone. Looking for somewhere to sit.');
+    setControls([]);
+    offerSeats();
+  }
+  function offerSeats(){
+    Object.values(popsEl).forEach(c => { if(!c.classList.contains('refused') && !c.classList.contains('sat')) c.setAttribute('class','pops'); });
+    const near = pops.filter(p => !S.refused.has(p.id) && !S.sat.has(p.id))
+      .map(p => ({p, d: Math.hypot(p.u-S.cur.x, p.v*STREET_M-S.cur.y)}))
+      .sort((a,b)=>a.d-b.d);
+    if (near.length===0){
+      // every space in this window has already refused you or been used. the game
+      // never soft-locks over this: you always have the curb.
+      S.options = new Set();
+      say('Every space here has already turned you away or filled up. There is nowhere left to try.');
+      setControls([{t:'Sit on the curb',f:curbSit,ghost:true}]);
+      return;
+    }
+    let opts = near.filter(o => o.d<=S.lvl.seatRadius).slice(0,S.lvl.maxOptions).map(o=>o.p);
+    if (opts.length<3) opts = near.slice(0,3).map(o=>o.p);
+    opts.forEach(p => popsEl[p.id].setAttribute('class','pops option'));
+    S.options = new Set(opts.map(p=>p.id));
+    render();
+  }
+  function curbSit(){
+    S.clock += 5; S.sinceSit = 0;
+    log('Nowhere left to try. You sit on the curb.', 'refuse');
+    say('Rested, such as it is. Back to the grid — the lit corners are your next step.');
+    S.phase='walking'; S.prev=null;
+    setControls([]);
+    render();
+    if (sameNode(S.cur,S.end)){ finish(); return; }
+  }
+  function onPopsClick(p){
+    if (S.phase!=='tired' || !S.options.has(p.id)) return;
+    Object.values(popsEl).forEach(c => { if(c.classList.contains('option')) c.setAttribute('class','pops'); });
+    // walking to the seat still has to follow the grid — no diagonal shortcuts just
+    // because you're tired. Distance and the drawn route are both along-avenue-then-
+    // along-street, exactly like every other move.
+    const target = nearestNode(p.u, p.v*STREET_M);
+    const corner = { x: target.x, y: S.cur.y };
+    const d = l1(S.cur, target);
+    const blocksWalked = Math.abs(target.s - S.cur.s) + Math.abs(target.ai - S.cur.ai);
+    S.walked += d; S.blocks += Math.max(1, blocksWalked);
+    S.clock += Math.round(d/WALK_SPEED);
+    S.prev = S.cur; S.path.push(corner, target); S.cur = target;
+    evaluateSeat(p);
+  }
+  function evaluateSeat(p){
+    const name = label(p);
+    const closed = p.r && S.clock >= S.lvl.closeMin;
+    let msg, ok;
+    if (closed){
+      ok=false; S.clock += 3;
+      msg = `${name}. ${p.t}. Restricted hours. Locked since ${fmtClock(S.lvl.closeMin)}. It is ${fmtClock(S.clock)}. You stand at the gate.`;
+    } else if (!p.s){
+      ok=false; S.clock += 3;
+      msg = `${name}. ${p.t}. The zoning required no seating and none was provided. You lean on a bollard and move on.`;
+    } else if (p.i){
+      ok=true; S.clock += 10;
+      msg = `${name}. ${p.t}. Indoors, climate-controlled. You sit. Someone at a desk has noticed you.`;
+    } else if (/residential/i.test(p.t)){
+      ok=true; S.clock += 10;
+      msg = `${name}. Residential plaza. You sit between the planters. The doorman looks up.`;
+    } else {
+      ok=true; S.clock += 10;
+      msg = `${name}. ${p.t}. You sit. A plaque says this space is open to the public.`;
+    }
+    S.sits.push({p, ok});
+    render();
+    if (ok){
+      S.sat.add(p.id); popsEl[p.id].setAttribute('class','pops sat');
+      S.sinceSit = 0;
+      log(msg, 'sat');
+      say('Rested. Back to the grid — the lit corners are your next step.');
+      S.phase='walking'; S.prev=null;
+      render();
+      if (sameNode(S.cur,S.end)){ finish(); return; }
+    } else {
+      S.refused.add(p.id); popsEl[p.id].setAttribute('class','pops refused');
+      log(msg, 'refuse');
+      say('Refused. Still tired. Choose somewhere else lit.');
+      S.phase='tired';
+      offerSeats();
+    }
+  }
+
+  function finish(){
+    S.phase='done';
+    say('You have arrived.');
+    const lvl = S.lvl;
+    const idealM = l1(S.start, S.end);
+    const idealTime = idealM / WALK_SPEED;
+    const elapsed = S.clock - (18*60+22);
+    const lostMin = Math.max(0, Math.round(elapsed - idealTime));
+    const efficiency = Math.max(0, Math.min(100, Math.round(idealM / Math.max(1,S.walked) * 100)));
+    const granted = S.sits.filter(s=>s.ok).length, refused = S.sits.length-granted, attempts = S.sits.length;
+    const refusalRate = attempts>0 ? refused/attempts*100 : 0;
+
+    // The round score is built only from ratios (distance actually walked against the
+    // grid's shortest possible route; seats refused against seats attempted) — both are
+    // already scaled by the trip the difficulty level demanded, so a longer or shorter
+    // required trip can't itself inflate or deflate the number. This is what decides
+    // next round's difficulty, not the raw minutes or meters.
+    const roundScore = Math.round(efficiency*0.6 + (100-refusalRate)*0.4);
+    const prevDifficulty = difficulty;
+    let delta = 0;
+    if (roundScore >= 75 && difficulty < LEVELS.length) delta = 1;
+    else if (roundScore <= 40 && difficulty > 1) delta = -1;
+    difficulty = Math.max(1, Math.min(LEVELS.length, difficulty + delta));
+
+    HISTORY.push({ efficiency, lostMin, blocks:S.blocks, sat:granted, refused, walked:S.walked, ideal:idealM, roundScore, level: prevDifficulty });
+
+    let shift;
+    if (delta > 0) shift = `Round score ${roundScore}/100. The city tightens: next round moves to difficulty ${difficulty}/5 — a longer required trip, shorter legs, an earlier lockup.`;
+    else if (delta < 0) shift = `Round score ${roundScore}/100. The city eases up: next round drops to difficulty ${difficulty}/5.`;
+    else shift = `Round score ${roundScore}/100. Difficulty holds at ${difficulty}/5.`;
+
+    let verdict;
+    if (efficiency >= 90) verdict = 'Near-ideal route. Very little was lost to the grid.';
+    else if (efficiency >= 65) verdict = `A route with detours. ${lostMin} minutes lost that the shortest path would not have cost.`;
+    else verdict = `A route mostly made of detours. ${lostMin} minutes lost — most of this trip was not the trip you planned.`;
+    verdict += ' ' + shift;
+
+    log(`Arrived. ${Math.round(S.walked)} m walked; the grid's shortest possible route was ${Math.round(idealM)} m.`);
+    resultsEl.style.display='block';
+    resultsEl.innerHTML = `
+      <div class="stat"><span>Difficulty played</span><span>${lvl.label}</span></div>
+      <div class="stat"><span>Grid-ideal distance</span><span>${Math.round(idealM)} m</span></div>
+      <div class="stat"><span>Walked</span><span>${Math.round(S.walked)} m · ${S.blocks} blocks</span></div>
+      <div class="stat"><span>Closeness to ideal</span><span>${efficiency}%</span></div>
+      <div class="stat"><span>Minutes lost</span><span>${lostMin} min</span></div>
+      <div class="stat"><span>Attempts to sit</span><span>${attempts}</span></div>
+      <div class="stat"><span>Seated / refused</span><span>${granted} / ${refused}</span></div>
+      <div class="stat"><span>Round score</span><span>${roundScore}/100</span></div>
+      <div class="verdict">${verdict}</div>`;
+    setControls([{t:'Walk again',f:reset,ghost:true}]);
+    renderHistory();
+  }
+
+  function renderHistory(){
+    if (HISTORY.length===0){ historyEl.style.display='none'; return; }
+    historyEl.style.display='block';
+    const avgScore = Math.round(HISTORY.reduce((a,h)=>a+h.roundScore,0)/HISTORY.length);
+    const totalLost = HISTORY.reduce((a,h)=>a+h.lostMin,0);
+    let rows = HISTORY.map((h,i) => `<tr><td>#${i+1}</td><td>${h.level}</td><td>${h.roundScore}</td><td>${h.lostMin} min</td><td>${h.sat}/${h.sat+h.refused}</td></tr>`).join('');
+    historyEl.innerHTML = `
+      <div class="history-title">Across ${HISTORY.length} trip${HISTORY.length===1?'':'s'}</div>
+      <table>
+        <thead><tr><th>Trip</th><th>Lvl</th><th>Score</th><th>Lost</th><th>Seated</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr><td>Average</td><td></td><td>${avgScore}</td><td>${totalLost} min</td><td></td></tr></tfoot>
+      </table>`;
+  }
+
+  document.getElementById('aboutToggle').addEventListener('click', () => {
+    const a=document.getElementById('about'); a.style.display = a.style.display==='block'?'none':'block';
+  });
+
+  reset();
+})();
+</script>
+</body>
+</html>
